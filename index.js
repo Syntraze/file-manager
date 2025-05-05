@@ -10,7 +10,6 @@ import readline from "readline";
 import process from "process";
 import { changeFolder } from "./fs/changeFolder.js";
 
-// Ensure the username argument is provided
 const usernameArg = process.argv.find((arg) => arg.startsWith("--username="));
 const username = usernameArg ? usernameArg.split("=")[1] : "Guest";
 
@@ -127,6 +126,20 @@ rl.on("line", async (command) => {
         } catch {
           console.log("Operation failed. Unable to rename the file.");
         }
+      }
+      break;
+    case input.startsWith("hash "):
+      try {
+        if (args.length > 1) {
+          console.log("Invalid input. Please provide a single file name.");
+        } else {
+          const pathToFile = args[0];
+          const hash = await calculateHash(pathToFile);
+          console.log(hash);
+          currentDirectory();
+        }
+      } catch (err) {
+        console.log("Operation failed. Unable to rename the file.");
       }
       break;
 
