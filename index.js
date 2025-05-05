@@ -11,7 +11,8 @@ import process from "process";
 import { changeFolder } from "./fs/changeFolder.js";
 import { compress } from "./compression/compress.js";
 import { decompress } from "./compression/decompress.js";
-
+import { osFunc } from "./os/os.js";
+import { changeToHomeDirectory } from "./os/os.js";
 const usernameArg = process.argv.find((arg) => arg.startsWith("--username="));
 const username = usernameArg ? usernameArg.split("=")[1] : "Guest";
 
@@ -21,6 +22,7 @@ const rl = readline.createInterface({
 });
 
 console.log(`Welcome! You are in File Manager, ${username}!`);
+changeToHomeDirectory();
 currentDirectory();
 
 rl.on("line", async (command) => {
@@ -156,7 +158,7 @@ rl.on("line", async (command) => {
           } else {
             const pathToFile = args[0];
             const pathToDestination = args[1];
-            compress(pathToFile, pathToDestination);
+            let dfg=compress(pathToFile, pathToDestination);
             console.log("File compressed successfully.");
           }
         } catch (err) {
@@ -175,11 +177,28 @@ rl.on("line", async (command) => {
           } else {
             const pathToFile = args[0];
             const pathToDestination = args[1];
-            await decompress(pathToFile, pathToDestination);
+            let ddg = await decompress(pathToFile, pathToDestination);
             console.log("File decompressed successfully.");
           }
         } catch (err) {
           console.log("Operation failed. Unable to decompress the file.");
+        }
+      })();
+      break;
+
+    case input.startsWith("os "):
+      (async () => {
+        try {
+          if (args.length > 1) {
+            console.log("Invalid input. Please provide a valid OS parameter.");
+          } else {
+            const parameter = args[0];
+            const osCommand = await osFunc(parameter);
+            console.log(osCommand);
+            currentDirectory();
+          }
+        } catch (err) {
+          console.log("Operation failed. Unable to execute OS command.");
         }
       })();
       break;
