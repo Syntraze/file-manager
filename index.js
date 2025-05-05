@@ -11,10 +11,12 @@ import process from "process";
 import { changeFolder } from "./fs/changeFolder.js";
 import { compress } from "./compression/compress.js";
 import { decompress } from "./compression/decompress.js";
-import { osFunc } from "./os/os.js";
-import { changeToHomeDirectory } from "./os/os.js";
-const usernameArg = process.argv.find((arg) => arg.startsWith("--username="));
-const username = usernameArg ? usernameArg.split("=")[1] : "Guest";
+import { osFunc, changeToHomeDirectory } from "./os/os.js";
+import { calculateHash } from "./hash/hash.js"; 
+import { executeSafely, handleInvalidArgs } from "./utils.js"; 
+const username =
+  process.argv.find((arg) => arg.startsWith("--username="))?.split("=")[1] ||
+  "Guest";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -25,8 +27,8 @@ console.log(`Welcome! You are in File Manager, ${username}!`);
 changeToHomeDirectory();
 currentDirectory();
 
-rl.on("line", async (command) => {
-  const input = command.trim();
+rl.on("line", async (inputRaw) => {
+  const input = inputRaw.trim();
   const args = parseArguments(input);
 
   if (input === ".exit") {
@@ -35,177 +37,115 @@ rl.on("line", async (command) => {
     return;
   }
 
-  switch (true) {
-    case input === "up":
-      changeFolder("up");
+  if (input === "up") {
+    changeFolder("up");
+    return currentDirectory();
+  }
+
+  if (input.startsWith("cd ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a valid directory.")
+      : (changeFolder(args[0]), currentDirectory());
+  }
+
+  if (input === "ls") {
+    return executeSafely(async () => {
+      const files = await list();
+      console.log(files);
       currentDirectory();
-      break;
+    }, "Unable to list files.");
+  }
 
-    case input.startsWith("cd "):
-      if (args.length !== 1) {
-        console.log("Invalid input. Please provide a valid directory.");
-      } else {
-        changeFolder(args[0]);
-        currentDirectory();
-      }
-      break;
-
-    case input === "ls":
-      try {
-        const files = await list();
-        console.log(files);
-        currentDirectory();
-      } catch {
-        console.log("Operation failed. Unable to list files.");
-      }
-      break;
-
-    case input.startsWith("rm "):
-      if (args.length !== 1) {
-        console.log("Invalid input. Please provide a valid file to remove.");
-      } else {
-        try {
+  if (input.startsWith("rm ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a valid file to remove.")
+      : executeSafely(async () => {
           const result = await remove(args[0]);
           console.log(result);
           currentDirectory();
-        } catch {
-          console.log("Operation failed. Unable to remove the file.");
-        }
-      }
-      break;
+        }, "Unable to remove the file.");
+  }
 
-    case input.startsWith("cat "):
-      if (args.length !== 1) {
-        console.log("Invalid input. Please provide a valid file to read.");
-      } else {
-        read(args[0]);
-      }
-      break;
+  if (input.startsWith("cat ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a valid file to read.")
+      : read(args[0]);
+  }
 
-    case input.startsWith("add "):
-      if (args.length !== 1) {
-        console.log(
-          "Invalid input. Please provide a valid file name to create."
-        );
-      } else {
-        create(args[0]);
-      }
-      break;
+  if (input.startsWith("add ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a valid file name to create.")
+      : create(args[0]);
+  }
 
-    case input.startsWith("cp "):
-      if (args.length !== 2) {
-        console.log("Invalid input. Please provide source and destination.");
-      } else {
-        try {
+  if (input.startsWith("cp ")) {
+    return args.length !== 2
+      ? handleInvalidArgs("Please provide source and destination.")
+      : executeSafely(async () => {
           await copy(args[0], args[1]);
           currentDirectory();
-        } catch {
-          console.log("Operation failed. Unable to copy the file.");
-        }
-      }
-      break;
+        }, "Unable to copy the file.");
+  }
 
-    case input.startsWith("mv "):
-      if (args.length !== 2) {
-        console.log("Invalid input. Please provide source and destination.");
-      } else {
-        try {
+  if (input.startsWith("mv ")) {
+    return args.length !== 2
+      ? handleInvalidArgs("Please provide source and destination.")
+      : executeSafely(async () => {
           await copy(args[0], args[1]);
           await remove(args[0]);
           currentDirectory();
-        } catch {
-          console.log("Operation failed. Unable to move the file.");
-        }
-      }
-      break;
+        }, "Unable to move the file.");
+  }
 
-    case input.startsWith("rn "):
-      if (args.length !== 2) {
-        console.log("Invalid input. Please provide old and new file names.");
-      } else {
-        try {
+  if (input.startsWith("rn ")) {
+    return args.length !== 2
+      ? handleInvalidArgs("Please provide old and new file names.")
+      : executeSafely(async () => {
           const result = await rename(args[0], args[1]);
           console.log(result);
           currentDirectory();
-        } catch {
-          console.log("Operation failed. Unable to rename the file.");
-        }
-      }
-      break;
+        }, "Unable to rename the file.");
+  }
 
-    case input.startsWith("hash "):
-      try {
-        if (args.length > 1) {
-          console.log("Invalid input. Please provide a single file name.");
-        } else {
-          const pathToFile = args[0];
-          const hash = await calculateHash(pathToFile);
+  if (input.startsWith("hash ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a single file name.")
+      : executeSafely(async () => {
+          const hash = await calculateHash(args[0]);
           console.log(hash);
           currentDirectory();
-        }
-      } catch (err) {
-        console.log("Operation failed. Unable to rename the file.");
-      }
-      break;
-
-    case input.startsWith("compress "):
-      (async () => {
-        try {
-          if (args.length > 2) {
-            console.log(
-              "Invalid input. Please provide source and destination."
-            );
-          } else {
-            const pathToFile = args[0];
-            const pathToDestination = args[1];
-            let dfg=compress(pathToFile, pathToDestination);
-            console.log("File compressed successfully.");
-          }
-        } catch (err) {
-          console.log("Operation failed. Unable to compress the file.");
-        }
-      })();
-      break;
-
-    case input.startsWith("decompress "):
-      (async () => {
-        try {
-          if (args.length > 2) {
-            console.log(
-              "Invalid input. Please provide source and destination."
-            );
-          } else {
-            const pathToFile = args[0];
-            const pathToDestination = args[1];
-            let ddg = await decompress(pathToFile, pathToDestination);
-            console.log("File decompressed successfully.");
-          }
-        } catch (err) {
-          console.log("Operation failed. Unable to decompress the file.");
-        }
-      })();
-      break;
-
-    case input.startsWith("os "):
-      (async () => {
-        try {
-          if (args.length > 1) {
-            console.log("Invalid input. Please provide a valid OS parameter.");
-          } else {
-            const parameter = args[0];
-            const osCommand = await osFunc(parameter);
-            console.log(osCommand);
-            currentDirectory();
-          }
-        } catch (err) {
-          console.log("Operation failed. Unable to execute OS command.");
-        }
-      })();
-      break;
-
-    default:
-      console.log("Invalid command. Please try again.");
+        }, "Unable to calculate file hash.");
   }
+
+  if (input.startsWith("compress ")) {
+    return args.length !== 2
+      ? handleInvalidArgs("Please provide source and destination.")
+      : executeSafely(async () => {
+          await compress(args[0], args[1]);
+          console.log("File compressed successfully.");
+        }, "Unable to compress the file.");
+  }
+
+  if (input.startsWith("decompress ")) {
+    return args.length !== 2
+      ? handleInvalidArgs("Please provide source and destination.")
+      : executeSafely(async () => {
+          await decompress(args[0], args[1]);
+          console.log("File decompressed successfully.");
+        }, "Unable to decompress the file.");
+  }
+
+  if (input.startsWith("os ")) {
+    return args.length !== 1
+      ? handleInvalidArgs("Please provide a valid OS parameter.")
+      : executeSafely(async () => {
+          const result = await osFunc(args[0]);
+          console.log(result);
+          currentDirectory();
+        }, "Unable to execute OS command.");
+  }
+
+  console.log("Invalid command. Please try again.");
 });
 
 rl.on("SIGINT", () => {
