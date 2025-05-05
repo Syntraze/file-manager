@@ -1,0 +1,141 @@
+import { list } from "./fs/list.js";
+import { read } from "./fs/read.js";
+import { create } from "./fs/create.js";
+import { rename } from "./fs/rename.js";
+import { remove } from "./fs/delete.js";
+import { copy } from "./fs/copy.js";
+import { currentDirectory } from "./currentDirectory.js";
+import { parseArguments } from "./parseArguments.js";
+import readline from "readline";
+import process from "process";
+import { changeFolder } from "./fs/changeFolder.js";
+
+// Ensure the username argument is provided
+const usernameArg = process.argv.find((arg) => arg.startsWith("--username="));
+const username = usernameArg ? usernameArg.split("=")[1] : "Guest";
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+console.log(`Welcome! You are in File Manager, ${username}!`);
+currentDirectory();
+
+rl.on("line", async (command) => {
+  const input = command.trim();
+  const args = parseArguments(input);
+
+  if (input === ".exit") {
+    console.log(`Thank you for using File Manager, ${username}!`);
+    rl.close();
+    return;
+  }
+
+  switch (true) {
+    case input === "up":
+      changeFolder("up");
+      currentDirectory();
+      break;
+
+    case input.startsWith("cd "):
+      if (args.length !== 1) {
+        console.log("Invalid input. Please provide a valid directory.");
+      } else {
+        changeFolder(args[0]);
+        currentDirectory();
+      }
+      break;
+
+    case input === "ls":
+      try {
+        const files = await list();
+        console.log(files);
+        currentDirectory();
+      } catch {
+        console.log("Operation failed. Unable to list files.");
+      }
+      break;
+
+    case input.startsWith("rm "):
+      if (args.length !== 1) {
+        console.log("Invalid input. Please provide a valid file to remove.");
+      } else {
+        try {
+          const result = await remove(args[0]);
+          console.log(result);
+          currentDirectory();
+        } catch {
+          console.log("Operation failed. Unable to remove the file.");
+        }
+      }
+      break;
+
+    case input.startsWith("cat "):
+      if (args.length !== 1) {
+        console.log("Invalid input. Please provide a valid file to read.");
+      } else {
+        read(args[0]);
+      }
+      break;
+
+    case input.startsWith("add "):
+      if (args.length !== 1) {
+        console.log(
+          "Invalid input. Please provide a valid file name to create."
+        );
+      } else {
+        create(args[0]);
+      }
+      break;
+
+    case input.startsWith("cp "):
+      if (args.length !== 2) {
+        console.log("Invalid input. Please provide source and destination.");
+      } else {
+        try {
+          await copy(args[0], args[1]);
+          currentDirectory();
+        } catch {
+          console.log("Operation failed. Unable to copy the file.");
+        }
+      }
+      break;
+
+    case input.startsWith("mv "):
+      if (args.length !== 2) {
+        console.log("Invalid input. Please provide source and destination.");
+      } else {
+        try {
+          await copy(args[0], args[1]);
+          await remove(args[0]);
+          currentDirectory();
+        } catch {
+          console.log("Operation failed. Unable to move the file.");
+        }
+      }
+      break;
+
+    case input.startsWith("rn "):
+      if (args.length !== 2) {
+        console.log("Invalid input. Please provide old and new file names.");
+      } else {
+        try {
+          const result = await rename(args[0], args[1]);
+          console.log(result);
+          currentDirectory();
+        } catch {
+          console.log("Operation failed. Unable to rename the file.");
+        }
+      }
+      break;
+
+    default:
+      console.log("Invalid command. Please try again.");
+  }
+});
+
+rl.on("SIGINT", () => {
+  console.log(`Thank you for using File Manager, ${username}!`);
+  rl.close();
+});
