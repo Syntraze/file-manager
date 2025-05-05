@@ -9,6 +9,8 @@ import { parseArguments } from "./parseArguments.js";
 import readline from "readline";
 import process from "process";
 import { changeFolder } from "./fs/changeFolder.js";
+import { compress } from "./compression/compress.js";
+import { decompress } from "./compression/decompress.js";
 
 const usernameArg = process.argv.find((arg) => arg.startsWith("--username="));
 const username = usernameArg ? usernameArg.split("=")[1] : "Guest";
@@ -128,6 +130,7 @@ rl.on("line", async (command) => {
         }
       }
       break;
+
     case input.startsWith("hash "):
       try {
         if (args.length > 1) {
@@ -141,6 +144,44 @@ rl.on("line", async (command) => {
       } catch (err) {
         console.log("Operation failed. Unable to rename the file.");
       }
+      break;
+
+    case input.startsWith("compress "):
+      (async () => {
+        try {
+          if (args.length > 2) {
+            console.log(
+              "Invalid input. Please provide source and destination."
+            );
+          } else {
+            const pathToFile = args[0];
+            const pathToDestination = args[1];
+            compress(pathToFile, pathToDestination);
+            console.log("File compressed successfully.");
+          }
+        } catch (err) {
+          console.log("Operation failed. Unable to compress the file.");
+        }
+      })();
+      break;
+
+    case input.startsWith("decompress "):
+      (async () => {
+        try {
+          if (args.length > 2) {
+            console.log(
+              "Invalid input. Please provide source and destination."
+            );
+          } else {
+            const pathToFile = args[0];
+            const pathToDestination = args[1];
+            await decompress(pathToFile, pathToDestination);
+            console.log("File decompressed successfully.");
+          }
+        } catch (err) {
+          console.log("Operation failed. Unable to decompress the file.");
+        }
+      })();
       break;
 
     default:
